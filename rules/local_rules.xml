@@ -1,0 +1,94 @@
+<!-- Local Rules -->
+
+<group name="local,syslog,">
+  <!-- Windows брутфорс атаки -->
+  <rule id="111001" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>60122</if_matched_sid>
+    <same_source_ip />
+    <description>Windows bruteforce attack</description>
+  </rule>
+
+  <!-- MikroTik брутфорс атаки -->
+  <rule id="111002" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>2501</if_matched_sid>
+    <same_source_ip />
+    <description>Mikrotik bruteforce attack</description>
+  </rule>
+
+  <!-- Ubuntu Desktop брутфорс атаки -->
+  <rule id="111003" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>2501</if_matched_sid>
+    <same_source_ip />
+    <description>Ubuntu Desktop bruteforce attack</description>
+  </rule>
+
+  <!-- Ubuntu Server брутфорс атаки -->
+  <rule id="111004" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>5503</if_matched_sid>
+    <same_source_ip />
+    <description>Ubuntu Server bruteforce attack</description>
+  </rule>
+
+  <!-- Ubuntu Server брутфорс атаки через SSH -->
+  <rule id="111006" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>5760</if_matched_sid>
+    <same_source_ip />
+    <description>Ubuntu Server bruteforce attack(SSH)</description>
+  </rule>
+
+  <!-- Ubuntu Desktop брутфорс атаки через SSH -->
+  <rule id="111007" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>5760</if_matched_sid>
+    <same_source_ip />
+    <description>Ubuntu Desktop bruteforce attack(SSH)</description>
+  </rule>
+
+  <!-- Windows брутфорс атаки через SSH -->
+  <rule id="111008" level="12" frequency="5" timeframe="240">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <description>Windows bruteforce attack(SSH)</description>
+  </rule>
+
+  <!-- Проверка доступности хостов -->
+  <rule id="111010" level="8" frequency="1" timeframe="240">
+    <if_matched_sid>503</if_matched_sid>
+    <description>Ubuntu Server online</description>
+  </rule>
+
+  <rule id="111011" level="8" frequency="1" timeframe="240">
+    <decoded_as>ping-windows</decoded_as>
+    <field name="status">down</field>
+    <description>Windows host is down</description>
+  </rule>
+
+  <rule id="111012" level="3" frequency="1" timeframe="240">
+    <decoded_as>ping-windows</decoded_as>
+    <field name="status">up</field>
+    <description>Windows host is up</description>
+  </rule>
+
+  <rule id="111013" level="8" frequency="1" timeframe="240">
+    <decoded_as>ping-ubuntu-server</decoded_as>
+    <field name="status">down</field>
+    <description>Ubuntu Server host is down</description>
+  </rule>
+
+  <rule id="111014" level="3" frequency="1" timeframe="240">
+    <decoded_as>ping-ubuntu-server</decoded_as>
+    <field name="status">up</field>
+    <description>Ubuntu Server host is up</description>
+  </rule>
+
+  <rule id="111015" level="8" frequency="1" timeframe="240">
+    <decoded_as>ping-ubuntu-desktop</decoded_as>
+    <field name="status">down</field>
+    <description>Ubuntu Desktop host is down</description>
+  </rule>
+
+  <rule id="111016" level="3" frequency="1" timeframe="240">
+    <decoded_as>ping-ubuntu-desktop</decoded_as>
+    <field name="status">up</field>
+    <description>Ubuntu Desktop host is up</description>
+  </rule>
+</group> 

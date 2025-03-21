@@ -1,0 +1,75 @@
+<!-- Local Decoders -->
+
+<!-- MikroTik декодеры -->
+<decoder name="mikrotik">
+  <prematch>Mikrotik</prematch>
+</decoder>
+
+<decoder name="mikrotik-login-success">
+  <parent>mikrotik</parent>
+  <prematch>login success</prematch>
+  <regex offset="after_prematch">for user (\S+) from (\S+) via (\S+)</regex>
+  <order>user, srcip, protocol</order>
+</decoder>
+
+<decoder name="mikrotik-login-failure">
+  <parent>mikrotik</parent>
+  <prematch>login failure</prematch>
+  <regex offset="after_prematch">for user (\S+) from (\S+) via (\S+)</regex>
+  <order>user, srcip, protocol</order>
+</decoder>
+
+<!-- Windows декодеры -->
+<decoder name="windows">
+  <prematch>Windows</prematch>
+</decoder>
+
+<decoder name="windows-login-failure">
+  <parent>windows</parent>
+  <prematch>login failure</prematch>
+  <regex offset="after_prematch">for user (\S+) from (\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<!-- Ubuntu Server декодеры -->
+<decoder name="ubuntu-server">
+  <prematch>UbuntuServer</prematch>
+</decoder>
+
+<decoder name="ubuntu-server-login-failure">
+  <parent>ubuntu-server</parent>
+  <prematch>login failure</prematch>
+  <regex offset="after_prematch">for user (\S+) from (\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<!-- Ubuntu Desktop декодеры -->
+<decoder name="ubuntu-desktop">
+  <prematch>UbuntuDesktop</prematch>
+</decoder>
+
+<decoder name="ubuntu-desktop-login-failure">
+  <parent>ubuntu-desktop</parent>
+  <prematch>login failure</prematch>
+  <regex offset="after_prematch">for user (\S+) from (\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<!-- Ping декодеры для проверки доступности -->
+<decoder name="ping-windows">
+  <prematch>Program: windows-ping</prematch>
+  <regex>windows-ping: (\S+) is (\S+)</regex>
+  <order>ping_target, status</order>
+</decoder>
+
+<decoder name="ping-ubuntu-server">
+  <prematch>Program: userver-ping</prematch>
+  <regex>userver-ping: (\S+) is (\S+)</regex>
+  <order>ping_target, status</order>
+</decoder>
+
+<decoder name="ping-ubuntu-desktop">
+  <prematch>Program: udesktop-ping</prematch>
+  <regex>udesktop-ping: (\S+) is (\S+)</regex>
+  <order>ping_target, status</order>
+</decoder> 
