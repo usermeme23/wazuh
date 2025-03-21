@@ -1,0 +1,194 @@
+name: Wazuh CI/CD
+
+on:
+  push:
+    paths:
+      - 'rules/**/*.xml'
+      - 'decoders/**/*.xml'
+      - 'docker-compose.yml'
+      - '.github/workflows/ci.yml'
+      - 'scripts/**/*.sh'
+  pull_request:
+    paths:
+      - 'rules/**/*.xml'
+      - 'decoders/**/*.xml'
+      - 'docker-compose.yml'
+      - 'scripts/**/*.sh'
+  # Позволяет запускать рабочий процесс вручную из вкладки Actions
+  workflow_dispatch:
+
+jobs:
+  validate-xml:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install XML validation tools
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
+      # Первичная проверка XML-файлов на синтаксическую корректность
+      - name: Validate XML syntax
+        run: |
+          echo "Проверка XML-файлов на синтаксическую корректность..."
+          find rules decoders -name "*.xml" -type f -exec xmllint --noout {} \; 2>&1
+          if [ $? -ne 0 ]; then
+            echo "❌ Найдены ошибки синтаксиса XML в файлах правил или декодеров"
+            exit 1
+          else
+            echo "✅ Синтаксис XML-файлов корректен"
+          fi
+
+  test-wazuh:
+    needs: validate-xml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Проверка версий Docker и Docker Compose
+      - name: Check Docker versions
+        run: docker --version && docker-compose --version
+        
+      # Генерация тестовых логов с использованием скрипта
+      - name: Generate test logs
+        run: |
+          chmod +x scripts/generate_test_logs.sh
+          ./scripts/generate_test_logs.sh
+
+      # Установка необходимых параметров ядра для Wazuh
+      - name: Set kernel parameters for Wazuh
+        run: sudo sysctl -w vm.max_map_count=262144
+
+      # Запуск контейнеров Wazuh
+      - name: Start Wazuh services
+        run: docker-compose up -d
+      
+      # Ожидание инициализации Wazuh
+      - name: Wait for Wazuh to initialize
+        run: |
+          echo "Waiting for Wazuh Manager to start..."
+          sleep 60
+          
+      # Копирование файлов правил и декодеров в контейнер
+      - name: Copy rules and decoders to container
+        run: |
+          docker-compose exec -T wazuh.manager mkdir -p /var/ossec/etc/rules /var/ossec/etc/decoders
+          docker cp rules/local_rules.xml $(docker-compose ps -q wazuh.manager):/var/ossec/etc/rules/
+          docker cp decoders/local_decoder.xml $(docker-compose ps -q wazuh.manager):/var/ossec/etc/decoders/
+          
+      # Проверка копирования файлов
+      - name: Verify files copied correctly
+        run: |
+          docker-compose exec -T wazuh.manager ls -la /var/ossec/etc/rules/local_rules.xml
+          docker-compose exec -T wazuh.manager ls -la /var/ossec/etc/decoders/local_decoder.xml
+
+      # Перезапуск Wazuh для применения новых правил и декодеров
+      - name: Restart Wazuh
+        run: docker-compose exec -T wazuh.manager /var/ossec/bin/wazuh-control restart
+
+      # Проверка статуса Wazuh после перезапуска
+      - name: Check Wazuh status after restart
+        run: |
+          sleep 10
+          docker-compose exec -T wazuh.manager /var/ossec/bin/wazuh-control status
+
+      # Проверка логов Wazuh на наличие ошибок
+      - name: Check Wazuh logs for errors
+        run: |
+          if docker-compose exec -T wazuh.manager grep -i "error\|critical\|ERROR\|CRITICAL" /var/ossec/logs/ossec.log; then
+            echo "❌ Найдены ошибки или критические сообщения в логах Wazuh"
+            docker-compose exec -T wazuh.manager grep -i "error\|critical\|ERROR\|CRITICAL" /var/ossec/logs/ossec.log
+            exit 1
+          else
+            echo "✅ Ошибок в логах Wazuh не обнаружено"
+          fi
+
+      # Копирование всех тестовых логов в контейнер для тестирования
+      - name: Copy test logs to container
+        run: |
+          for log_file in tests/logs/*.log; do
+            echo "Копирование $log_file..."
+            docker cp $log_file $(docker-compose ps -q wazuh.manager):/var/ossec/logs/
+          done
+          
+      # Тестирование декодеров и правил для всех типов логов
+      - name: Test decoders and rules with all test logs
+        run: |
+          echo "Тестирование декодеров и правил с помощью wazuh-logtest..."
+          for log_type in mikrotik windows ubuntu_server ubuntu_desktop ping; do
+            echo "Тестирование логов $log_type..."
+            docker-compose exec -T wazuh.manager bash -c "cat /var/ossec/logs/test_${log_type}.log | while read line; do echo \$line | /var/ossec/bin/wazuh-logtest -q; done"
+            echo "------------------------------------"
+          done
+          
+      # Тестирование отдельных строк логов для подтверждения работы правил и декодеров
+      - name: Test specific log entries
+        run: |
+          echo "Тестирование конкретных записей логов..."
+          
+          echo "Тестирование MikroTik..."
+          docker-compose exec -T wazuh.manager bash -c 'echo "Mikrotik login success for user admin from 192.168.1.100 via ssh" | /var/ossec/bin/wazuh-logtest'
+          docker-compose exec -T wazuh.manager bash -c 'echo "Mikrotik system reboot requested by admin from 192.168.1.100" | /var/ossec/bin/wazuh-logtest'
+          
+          echo "Тестирование Windows..."
+          docker-compose exec -T wazuh.manager bash -c 'echo "Windows login success for user Administrator from 192.168.1.200" | /var/ossec/bin/wazuh-logtest'
+          
+          echo "Тестирование Ubuntu Server..."
+          docker-compose exec -T wazuh.manager bash -c 'echo "UbuntuServer login success for user admin from 10.0.0.100" | /var/ossec/bin/wazuh-logtest'
+          
+          echo "Тестирование Ubuntu Desktop..."
+          docker-compose exec -T wazuh.manager bash -c 'echo "UbuntuDesktop login success for user user1 from 10.0.0.200" | /var/ossec/bin/wazuh-logtest'
+
+      # Остановка контейнеров Wazuh
+      - name: Stop Wazuh services
+        run: docker-compose down
+        if: always()
+
+  # Создание и обновление бейджа статуса CI
+  create-badge:
+    needs: [validate-xml, test-wazuh]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create status badge
+        run: |
+          if [ "${{ needs.validate-xml.result }}" == "success" ] && [ "${{ needs.test-wazuh.result }}" == "success" ]; then
+            echo '{"schemaVersion":1,"label":"CI","message":"passing","color":"brightgreen"}' > badge.json
+          else
+            echo '{"schemaVersion":1,"label":"CI","message":"failing","color":"red"}' > badge.json
+          fi
+
+  # Отправка уведомления используя встроенные возможности GitHub Actions
+  notify:
+    needs: [validate-xml, test-wazuh]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          # Используем GitHub Actions для отправки email
+          username: ${{ github.actor }}@users.noreply.github.com
+          password: ${{ secrets.GITHUB_TOKEN }}
+          subject: GitHub Action CI для Wazuh - ${{ needs.test-wazuh.result == 'success' && 'PASSED ✅' || 'FAILED ❌' }}
+          body: |
+            Статус CI/CD для Wazuh репозитория:
+            
+            Результат валидации XML: ${{ needs.validate-xml.result }}
+            Результат тестирования Wazuh: ${{ needs.test-wazuh.result }}
+            
+            Подробности можно посмотреть здесь: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Коммит: ${{ github.event.head_commit.message }}
+            
+            С уважением,
+            Автоматизированная система CI/CD
+          to: chaladima08@gmail.com
+          from: GitHub Actions CI 
