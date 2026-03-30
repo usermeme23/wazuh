@@ -1,0 +1,3 @@
+wazuh-yara: INFO - Scan result: malware_rule /path/to/malicious/file.exe
+wazuh-yara: INFO - Scan result: ransomware_rule /path/to/suspicious/document.doc
+wazuh-yara: WARNING - No matches found for file /path/to/clean/file.txt
